@@ -1,0 +1,11 @@
+scenedetect[opencv]
+ffmpeg-python
+openai-whisper
+langchain
+langchain-openai
+langchain-chroma
+chromadb
+streamlit
+sentence-transformers
+python-dotenv
+Pillow

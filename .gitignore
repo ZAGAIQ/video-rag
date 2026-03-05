@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+.env
+.DS_Store
+*.mp4
+*.mkv
+*.avi
+chroma_db/
+.streamlit/
+*.log
