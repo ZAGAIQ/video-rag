@@ -11,7 +11,7 @@ from langchain_core.prompts import PromptTemplate
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-VLM_MODEL = os.getenv("VLM_MODEL", "openai/gpt-4o-mini")
+VLM_MODEL = os.getenv("VLM_MODEL", "google/gemini-2.5-flash-lite")
 
 st.set_page_config(page_title="Video RAG MVP", layout="wide")
 
@@ -45,8 +45,9 @@ def generate_explanation(llm, query: str, context: str) -> str:
         input_variables=["context", "query"],
         template=(
             "Ты — киновед и помощник по поиску видео. Пользователь ищет определенную сцену. "
-            "На основе предоставленного контекста (описание сцен и диалоги) ответь на запрос "
-            "пользователя и объясни, почему именно эта сцена (или сцены) подходит лучше всего.\n\n"
+            "На основе предоставленного контекста ответь на запрос пользователя, "
+            "учитывая, что диалоги могут продолжаться из предыдущей в следующую сцену. "
+            "Объясни, почему именно эта сцена (или сцены) подходит лучше всего.\n\n"
             "Запрос пользователя: {query}\n\n"
             "Контекст найденных сцен:\n{context}\n\n"
             "Твой ответ (будь краток и по делу):"
@@ -82,10 +83,19 @@ if query:
                 # Prepare context for the LLM
                 context_str = ""
                 for i, doc in enumerate(results):
-                    context_str += f"--- Сцена {i+1} ---\n"
-                    context_str += f"Файл: {doc.metadata.get('video_filename')}\n"
-                    context_str += f"Время: {doc.metadata.get('start_time'):.1f}s - {doc.metadata.get('end_time'):.1f}s\n"
-                    context_str += f"Содержимое: {doc.page_content}\n\n"
+                    start_t = doc.metadata.get('start_time', 0.0)
+                    end_t = doc.metadata.get('end_time', 0.0)
+                    prev_dialogue = doc.metadata.get('prev_dialogue', '')
+                    next_dialogue = doc.metadata.get('next_dialogue', '')
+                    summary_and_current = doc.page_content
+
+                    context_str += (
+                        f"--- Сцена {i+1} ---\n"
+                        f"Таймкод: {start_t:.1f} - {end_t:.1f}.\n"
+                        f"Описание сцены: {summary_and_current}.\n"
+                        f"Предыдущие слова: {prev_dialogue}.\n"
+                        f"Следующие слова: {next_dialogue}.\n\n"
+                    )
                 
                 # Generate explanation
                 st.session_state.explanation = generate_explanation(llm, query, context_str)
@@ -98,10 +108,6 @@ if query:
     if not results:
         st.warning("Ничего не найдено. Возможно, база данных пуста.")
     else:
-        st.subheader("Ответ ИИ")
-        st.markdown(explanation)
-        
-        st.markdown("---")
         st.subheader("Найденные сцены")
         
         # Let the user select which scene to play
@@ -135,3 +141,7 @@ if query:
         with col2:
             st.subheader("Исходное извлечение")
             st.text(selected_scene.page_content)
+
+        st.markdown("---")
+        st.subheader("Ответ ИИ")
+        st.markdown(explanation)
